@@ -1,0 +1,90 @@
+services:
+  # hardhat:
+  #   build: ./forgecapita-contracts
+  #   container_name: forgecapita_hardhat
+  #   working_dir: /app
+  #   volumes:
+  #     - ./forgecapita-contracts:/app
+  #     - /app/node_modules
+  #   ports:
+  #     - "8545:8545"
+
+  indexer:
+    build: ./forgecapita-indexer
+    container_name: forgecapita_indexer
+    restart: unless-stopped
+    working_dir: /app
+    # The image defaults to `npm run start` (production). Local development uses the dev server with hot reload.
+    command: npm run dev
+    volumes:
+      - ./forgecapita-indexer:/app
+      - /app/node_modules
+    env_file:
+      - ./forgecapita-indexer/.env.local
+    ports:
+      - "42069:42069"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:42069/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+  api:
+    build: ./forgecapita-api
+    container_name: forgecapita_api
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./forgecapita-api:/app
+      - /app/node_modules
+    env_file:
+      - ./forgecapita-api/.env
+    ports:
+      - "3001:3001"
+
+  # Throwaway Postgres for the API integration tests (never started by default):
+  #   docker compose --profile test up -d --wait pg_test
+  #   docker compose exec -T api npm run test:integration
+  # Credentials are fixed test values, data lives in tmpfs and disappears on stop.
+  pg_test:
+    image: postgres:16-alpine
+    container_name: forgecapita_pg_test
+    profiles: ["test"]
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_USER: test
+      POSTGRES_DB: forgecapita_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d forgecapita_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  frontend:
+    build: ./forgecapita-frontend
+    container_name: forgecapita_frontend
+    working_dir: /app
+    volumes:
+      - ./forgecapita-frontend:/app
+      - /app/node_modules
+      - /app/.next
+    env_file:
+      - ./forgecapita-frontend/.env.local
+    environment:
+      - INTERNAL_EXPRESS_API=http://api:3001/api
+      - INTERNAL_PONDER_API=http://indexer:42069
+      - WATCHPACK_POLLING=true
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+      - indexer

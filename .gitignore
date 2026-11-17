@@ -1,0 +1,20 @@
+# Ignore Environment Variables (CRITICAL)
+**/.env
+.env
+
+# Ignore Node Modules
+**/node_modules/
+
+# Ignore Hardhat Build Files
+**/artifacts/
+**/cache/
+**/typechain-types/
+
+# Ignore Frontend Build Files
+**/dist/
+**/.next/
+
+# Ignore IDE / AI Files
+**/.vscode/
+**/.claude
+**/.cursor
